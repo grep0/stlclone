@@ -11,23 +11,29 @@ def _argparser():
     p.add_argument('-ny', type=int, default=1, help='Number of clones in Y direction')
     p.add_argument('-dx', type=float, default=0, help='Delta in X direction')
     p.add_argument('-dy', type=float, default=0, help='Delta in Y direction')
+    p.add_argument('-gap', type=float, default=-1, help='Gap between bounding boxes for auto placement (set this or -dx and -dy)')
     p.add_argument('-o', type=str, help='Output file')
-    p.add_argument('-i', type=str, help='Input file')
+    p.add_argument('-i', type=str, required=True, help='Input file')
     p.add_argument('-ascii', action='store_true', help='Ascii output')
     return p
 
 def main(argv):
     args = _argparser().parse_args(argv[1:])
     in_file = args.i
-    out_file = args.o or in_file + '_out.stl'
+    if args.o:
+        out_file = args.o
+    else:
+        out_file = in_file + '_out.stl'
+        print('output is going to', out_file)
     nx,ny,dx,dy = args.nx,args.ny,args.dx,args.dy
-    if nx>1 and dx==0:
-        print('error: nx>1 and dx=0')
-        return 1
-    if ny>1 and dy==0:
-        print('error: ny>1 and dy=0')
-        return 1
     mesh = stl.Mesh.from_file(in_file)
+    if args.gap>=0:
+        bbox_size = mesh.max_ - mesh.min_
+        if dx==0:
+            dx = bbox_size[stl.Dimension.X] + args.gap
+        if dy==0:
+            dy = bbox_size[stl.Dimension.Y] + args.gap
+        print('Auto delta:',(dx,dy))
     nt = mesh.data.shape[0]  # number of triangles
     print("Original mesh size:", nt)
     data_repl = np.tile(mesh.data, nx*ny)
@@ -40,6 +46,7 @@ def main(argv):
     mesh_repl = stl.Mesh(data_repl)
     print("Replicated mesh size:", mesh_repl.data.shape[0])
     mesh_repl.save(out_file, mode=stl.Mode.ASCII if args.ascii else stl.Mode.BINARY)
+    return 0
 
 if __name__ == "__main__":
-    main(sys.argv)
+    sys.exit(main(sys.argv))
